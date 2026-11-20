@@ -1,0 +1,39 @@
+# push ขึ้น main → build ทดสอบ → SSH เข้าเซิร์ฟเวอร์แล้วรัน deploy.sh
+# ไม่ต้องแก้ไฟล์นี้: ใช้ชื่อ repo เป็นชื่อโฟลเดอร์บนเซิร์ฟเวอร์อัตโนมัติ (~/<ชื่อ repo>)
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # ข้ามการ deploy ถ้ายังไม่ได้ใส่ Secrets (เช่น repo template เอง)
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: bash ~/${{ github.event.repository.name }}/deploy/deploy.sh

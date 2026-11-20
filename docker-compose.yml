@@ -1,0 +1,37 @@
+# ค่าทั้งหมดอ่านจากไฟล์ .env (สร้างอัตโนมัติด้วย deploy/setup-server.sh)
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_DB: app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ต้องตั้ง POSTGRES_PASSWORD ใน .env}
+      TZ: Asia/Bangkok
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${DB_PORT:?ต้องตั้ง DB_PORT ใน .env}:5432"   # สำหรับ DBeaver ผ่าน SSH เท่านั้น
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db:5432/app
+      SESSION_SECRET: ${SESSION_SECRET:?ต้องตั้ง SESSION_SECRET ใน .env}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    ports:
+      - "127.0.0.1:${APP_PORT:?ต้องตั้ง APP_PORT ใน .env}:3000"  # Nginx เท่านั้นที่เข้าถึงได้
+
+volumes:
+  pgdata:
